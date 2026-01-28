@@ -266,32 +266,50 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   // Handle update from overlay (no tabId in message, use sender.tab.id)
-  if (
-    message.type === "UPDATE_INPUT_VALUE" &&
-    sender.tab?.id &&
-    !message.tabId
-  ) {
+  if (message.type === "UPDATE_INPUT_VALUE" && !message.tabId) {
     const updateMessage = message as UpdateInputValueMessage
-    const tabId = sender.tab.id
 
-    // Forward to content script in the correct frame
-    chrome.tabs
-      .sendMessage(
-        tabId,
-        {
-          type: "UPDATE_INPUT_VALUE",
-          xpath: updateMessage.xpath,
-          value: updateMessage.value
-        } as UpdateInputValueMessage,
-        { frameId: updateMessage.frameId }
-      )
-      .then(() => {
-        // Refresh data after update
-        return collectAllHiddenInputs(tabId)
+    // Get tabId from sender.tab or find active tab as fallback
+    const getTabId = async (): Promise<number | null> => {
+      if (sender.tab?.id) {
+        return sender.tab.id
+      }
+      // Fallback: get active tab
+      const [activeTab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true
       })
-      .catch(() => {
-        // Failed to update input from overlay
-      })
+      return activeTab?.id ?? null
+    }
+
+    // Handle async operation
+    ;(async () => {
+      const tabId = await getTabId()
+      if (!tabId) {
+        console.error("Could not determine tab ID for overlay update")
+        return
+      }
+
+      try {
+        // Forward to content script in the correct frame
+        const response = await chrome.tabs.sendMessage(
+          tabId,
+          {
+            type: "UPDATE_INPUT_VALUE",
+            xpath: updateMessage.xpath,
+            value: updateMessage.value
+          } as UpdateInputValueMessage,
+          { frameId: updateMessage.frameId }
+        )
+
+        if (response?.success) {
+          // Refresh data after successful update
+          await collectAllHiddenInputs(tabId)
+        }
+      } catch (error) {
+        console.error("Failed to update input from overlay:", error)
+      }
+    })()
   }
 })
 
