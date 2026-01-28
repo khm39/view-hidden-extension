@@ -146,10 +146,18 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background-color: var(--color-bg-primary);
   border-bottom: 1px solid var(--color-border);
   padding: 12px 16px;
   box-shadow: var(--shadow-sm);
+}
+
+.popup-header-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .popup-title {
@@ -163,6 +171,25 @@ body {
   font-size: 12px;
   color: var(--color-text-secondary);
   margin-top: 2px;
+}
+
+.pin-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background-color: var(--color-bg-tertiary);
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.pin-btn:hover {
+  background-color: var(--color-accent);
+  color: white;
 }
 
 /* Frame list */
@@ -442,4 +469,12 @@ body {
   padding: 16px;
   color: #ef4444;
   font-size: 13px;
+}
+
+.error p {
+  margin: 0 0 12px 0;
+}
+
+.reload-btn {
+  width: 100%;
 }

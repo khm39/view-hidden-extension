@@ -13,11 +13,41 @@ export const config: PlasmoCSConfig = {
   run_at: "document_idle"
 }
 
+// XPath文字列のエスケープ処理
+// XPathではクォートを含む文字列にはconcat()を使用する必要がある
+function escapeXPathString(str: string): string {
+  // クォートを含まない場合はそのままダブルクォートで囲む
+  if (!str.includes('"')) {
+    return `"${str}"`
+  }
+  // ダブルクォートのみ含む場合はシングルクォートで囲む
+  if (!str.includes("'")) {
+    return `'${str}'`
+  }
+  // 両方含む場合はconcat()を使用
+  // 例: "it's \"quoted\"" → concat("it's ", '"', "quoted", '"')
+  const parts: string[] = []
+  let current = ""
+  for (const char of str) {
+    if (char === '"') {
+      if (current) {
+        parts.push(`"${current}"`)
+        current = ""
+      }
+      parts.push(`'"'`)
+    } else {
+      current += char
+    }
+  }
+  if (current) {
+    parts.push(`"${current}"`)
+  }
+  return `concat(${parts.join(", ")})`
+}
+
 function getXPath(element: Element): string {
   if (element.id) {
-    // Escape quotes in id to prevent XPath injection
-    const escapedId = element.id.replace(/"/g, "&quot;")
-    return `//*[@id="${escapedId}"]`
+    return `//*[@id=${escapeXPathString(element.id)}]`
   }
 
   const parts: string[] = []
@@ -94,6 +124,11 @@ function getFrameName(): string | null {
 }
 
 function sendHiddenInputsUpdate() {
+  // Check if extension context is still valid
+  if (!chrome.runtime?.id) {
+    return
+  }
+
   const inputs = collectHiddenInputs()
   const message: HiddenInputsUpdateMessage = {
     type: "HIDDEN_INPUTS_UPDATE",
@@ -102,7 +137,9 @@ function sendHiddenInputsUpdate() {
     frameName: getFrameName(),
     inputs
   }
-  chrome.runtime.sendMessage(message)
+  chrome.runtime.sendMessage(message).catch(() => {
+    // Extension context invalidated (extension was reloaded)
+  })
 }
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null

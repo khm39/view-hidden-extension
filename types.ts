@@ -44,10 +44,24 @@ export interface UpdateInputValueMessage {
   value: string
 }
 
-export interface PortMessage {
-  type: "FRAME_DATA" | "ALL_FRAMES_DATA" | "UPDATE_RESULT"
+// Discriminated union for port messages - stricter type safety
+export type PortMessage =
+  | { type: "ALL_FRAMES_DATA"; data: FrameHiddenInputs[] }
+  | { type: "FRAME_DATA"; frameData: FrameHiddenInputs }
+  | { type: "UPDATE_RESULT"; success: boolean; error?: string }
+
+export interface TogglePinMessage {
+  type: "TOGGLE_PIN"
+  tabId: number
+  pinned: boolean
+}
+
+export interface PinStateMessage {
+  type: "PIN_STATE"
+  pinned: boolean
   data?: FrameHiddenInputs[]
-  frameData?: FrameHiddenInputs
-  success?: boolean
-  error?: string
+}
+
+export interface CheckPinStateMessage {
+  type: "CHECK_PIN_STATE"
 }

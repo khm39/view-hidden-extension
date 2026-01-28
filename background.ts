@@ -3,7 +3,9 @@ import type {
   FrameInfo,
   HiddenInputsResultMessage,
   HiddenInputsUpdateMessage,
+  PinStateMessage,
   PortMessage,
+  TogglePinMessage,
   UpdateInputValueMessage
 } from "~types"
 
@@ -12,6 +14,9 @@ const tabFrameData = new Map<number, Map<number, FrameHiddenInputs>>()
 
 // Store connected popup ports per tab
 const popupPorts = new Map<number, chrome.runtime.Port>()
+
+// Store pinned state per tab
+const pinnedTabs = new Set<number>()
 
 function getFrameData(tabId: number): FrameHiddenInputs[] {
   const frameMap = tabFrameData.get(tabId)
@@ -37,6 +42,38 @@ function notifyPopup(tabId: number) {
       // Port disconnected
       popupPorts.delete(tabId)
     }
+  }
+
+  // Also notify overlay if pinned
+  if (pinnedTabs.has(tabId)) {
+    notifyOverlay(tabId)
+  }
+}
+
+function notifyOverlay(tabId: number) {
+  const data = getFrameData(tabId)
+  const message: PinStateMessage = {
+    type: "PIN_STATE",
+    pinned: true,
+    data
+  }
+  chrome.tabs.sendMessage(tabId, message).catch(() => {
+    // Content script not available
+  })
+}
+
+async function notifyOverlayWithResult(tabId: number): Promise<boolean> {
+  const data = getFrameData(tabId)
+  const message: PinStateMessage = {
+    type: "PIN_STATE",
+    pinned: true,
+    data
+  }
+  try {
+    await chrome.tabs.sendMessage(tabId, message)
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -130,7 +167,7 @@ async function collectAllHiddenInputs(tabId: number) {
   notifyPopup(tabId)
 }
 
-chrome.runtime.onMessage.addListener((message, sender, _sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "HIDDEN_INPUTS_UPDATE" && sender.tab?.id) {
     const tabId = sender.tab.id
     const frameId = sender.frameId ?? 0
@@ -163,6 +200,99 @@ chrome.runtime.onMessage.addListener((message, sender, _sendResponse) => {
     frameMap.set(frameId, frameHiddenInputs)
     notifyPopup(tabId)
   }
+
+  // Handle pin toggle from popup
+  if (message.type === "TOGGLE_PIN") {
+    const toggleMessage = message as TogglePinMessage
+    const tabId = toggleMessage.tabId
+
+    if (toggleMessage.pinned) {
+      pinnedTabs.add(tabId)
+      // Collect data and send to overlay
+      collectAllHiddenInputs(tabId)
+        .then(() => {
+          return notifyOverlayWithResult(tabId)
+        })
+        .then((success) => {
+          if (success) {
+            sendResponse({ success: true })
+          } else {
+            pinnedTabs.delete(tabId)
+            sendResponse({ success: false, error: "CONTENT_SCRIPT_NOT_LOADED" })
+          }
+        })
+        .catch(() => {
+          pinnedTabs.delete(tabId)
+          sendResponse({ success: false, error: "CONTENT_SCRIPT_NOT_LOADED" })
+        })
+    } else {
+      pinnedTabs.delete(tabId)
+      // Send unpin message to overlay
+      const unpinMessage: PinStateMessage = {
+        type: "PIN_STATE",
+        pinned: false
+      }
+      chrome.tabs.sendMessage(tabId, unpinMessage).catch(() => {
+        // Content script not available
+      })
+      sendResponse({ success: true })
+    }
+    return true
+  }
+
+  // Handle unpin from overlay
+  if (message.type === "UNPIN_OVERLAY" && sender.tab?.id) {
+    pinnedTabs.delete(sender.tab.id)
+  }
+
+  // Handle check pin state from overlay (after page navigation)
+  if (message.type === "CHECK_PIN_STATE" && sender.tab?.id) {
+    const tabId = sender.tab.id
+    const isPinned = pinnedTabs.has(tabId)
+
+    if (isPinned) {
+      // Collect fresh data and send to overlay
+      collectAllHiddenInputs(tabId)
+        .then(() => {
+          notifyOverlay(tabId)
+        })
+        .catch(() => {
+          // Failed to collect data
+        })
+    }
+
+    sendResponse({ pinned: isPinned })
+    return true
+  }
+
+  // Handle update from overlay (no tabId in message, use sender.tab.id)
+  if (
+    message.type === "UPDATE_INPUT_VALUE" &&
+    sender.tab?.id &&
+    !message.tabId
+  ) {
+    const updateMessage = message as UpdateInputValueMessage
+    const tabId = sender.tab.id
+
+    // Forward to content script in the correct frame
+    chrome.tabs
+      .sendMessage(
+        tabId,
+        {
+          type: "UPDATE_INPUT_VALUE",
+          xpath: updateMessage.xpath,
+          value: updateMessage.value
+        } as UpdateInputValueMessage,
+        { frameId: updateMessage.frameId }
+      )
+      .then(() => {
+        // Refresh data after update
+        return collectAllHiddenInputs(tabId)
+      })
+      .catch(() => {
+        // Failed to update input from overlay
+      })
+  }
 })
 
 chrome.runtime.onConnect.addListener((port) => {
@@ -187,8 +317,8 @@ chrome.runtime.onConnect.addListener((port) => {
         popupPorts.set(tabId, port)
 
         // Collect all hidden inputs when popup connects
-        collectAllHiddenInputs(tabId).catch((err) => {
-          console.error("Failed to collect hidden inputs:", err)
+        collectAllHiddenInputs(tabId).catch(() => {
+          // Failed to collect hidden inputs
         })
       }
 
@@ -216,8 +346,8 @@ chrome.runtime.onConnect.addListener((port) => {
             })
 
             // Refresh data after update (don't await, let it run in background)
-            collectAllHiddenInputs(tabId).catch((err) => {
-              console.error("Failed to refresh hidden inputs:", err)
+            collectAllHiddenInputs(tabId).catch(() => {
+              // Failed to refresh hidden inputs
             })
           } catch (error) {
             safePostMessage({
@@ -246,11 +376,26 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   tabFrameData.delete(tabId)
   popupPorts.delete(tabId)
+  pinnedTabs.delete(tabId)
 })
 
 // Clean up when tab navigates
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.status === "loading") {
     tabFrameData.delete(tabId)
+  }
+
+  // When page load completes, refresh data for pinned tabs
+  if (changeInfo.status === "complete" && pinnedTabs.has(tabId)) {
+    // Wait a bit for all frames to initialize
+    setTimeout(() => {
+      collectAllHiddenInputs(tabId)
+        .then(() => {
+          notifyOverlay(tabId)
+        })
+        .catch(() => {
+          // Failed to refresh pinned tab
+        })
+    }, 500)
   }
 })
