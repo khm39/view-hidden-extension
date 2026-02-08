@@ -1,45 +1,42 @@
 import { useEffect, useRef, useState } from "react"
 
-import {
-  FrameSection,
-  sortFrameInputs,
-  type EditingInput
-} from "~components/shared"
+import { Button } from "~components/Button"
+import { FrameSection } from "~components/FrameSection"
+import { PinIcon } from "~components/icons"
+import type { EditingInput } from "~components/types"
+import { useHiddenInputs } from "~hooks/useHiddenInputs"
 import type {
-  FrameHiddenInputs,
   PortMessage,
   TogglePinMessage,
-  UpdateInputValueMessage
+  UpdateInputValueMessageWithTab
 } from "~types"
+import { cn } from "~utils/cn"
+import {
+  ERROR_MESSAGES,
+  MESSAGE_TYPES,
+  TIMING,
+  UI_CONFIG
+} from "~utils/constants"
 
 import "./style.css"
 
-function PinIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg">
-      <path
-        d="M9.5 2L14 6.5L10.5 10L11 14L8 11L5 14L5.5 10L2 6.5L6.5 2L9.5 2Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
 function IndexPopup() {
-  const [frameInputs, setFrameInputs] = useState<FrameHiddenInputs[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [editingInput, setEditingInput] = useState<EditingInput | null>(null)
   const [tabId, setTabId] = useState<number | null>(null)
-  const [expandedFrames, setExpandedFrames] = useState<Set<number>>(new Set())
+
+  const {
+    frameInputs,
+    expandedFrames,
+    editingInput,
+    totalInputs,
+    toggleFrame,
+    handleEdit,
+    handleEditChange,
+    handleCancel,
+    setEditingInput,
+    handlePortMessage
+  } = useHiddenInputs({ collapseOnInitialLoad: true })
 
   // Use ref for port to avoid stale closure issues
   const portRef = useRef<chrome.runtime.Port | null>(null)
@@ -68,7 +65,7 @@ function IndexPopup() {
         })
 
         if (!tab?.id) {
-          setError("タブが見つかりません")
+          setError(ERROR_MESSAGES.TAB_NOT_FOUND)
           setLoading(false)
           return
         }
@@ -85,30 +82,12 @@ function IndexPopup() {
         })
 
         newPort.onMessage.addListener((message: PortMessage) => {
-          if (message.type === "ALL_FRAMES_DATA") {
-            const sorted = sortFrameInputs(message.data)
-            setFrameInputs(sorted)
-            // Only close all tabs on initial load
-            if (isInitialLoadRef.current) {
-              setExpandedFrames(new Set())
-              isInitialLoadRef.current = false
-            }
+          const result = handlePortMessage(message, isInitialLoadRef.current)
+          if (result.shouldSetLoading) {
+            isInitialLoadRef.current = false
             setLoading(false)
           }
-          if (message.type === "FRAME_DATA") {
-            setFrameInputs((prev) => {
-              const existing = prev.findIndex(
-                (f) => f.frame.frameId === message.frameData.frame.frameId
-              )
-              if (existing >= 0) {
-                const updated = [...prev]
-                updated[existing] = message.frameData
-                return updated
-              }
-              return [...prev, message.frameData]
-            })
-          }
-          if (message.type === "UPDATE_RESULT") {
+          if (message.type === MESSAGE_TYPES.UPDATE_RESULT) {
             if (!message.success && message.error) {
               setError(message.error)
             }
@@ -116,7 +95,7 @@ function IndexPopup() {
         })
 
         newPort.postMessage({
-          type: "SUBSCRIBE_UPDATES",
+          type: MESSAGE_TYPES.SUBSCRIBE_UPDATES,
           tabId: tab.id
         })
       } catch (err) {
@@ -138,25 +117,7 @@ function IndexPopup() {
       isConnectedRef.current = false
       portRef.current = null
     }
-  }, [])
-
-  const toggleFrame = (frameId: number) => {
-    setExpandedFrames((prev) => {
-      const next = new Set(prev)
-      if (next.has(frameId)) {
-        next.delete(frameId)
-      } else {
-        next.add(frameId)
-      }
-      return next
-    })
-  }
-
-  const handleEdit = (frameId: number, xpath: string, currentValue: string) => {
-    setEditingInput({ frameId, xpath, value: currentValue })
-    // Ensure the frame is expanded when editing
-    setExpandedFrames((prev) => new Set(prev).add(frameId))
-  }
+  }, [handlePortMessage])
 
   const handleSave = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -164,8 +125,8 @@ function IndexPopup() {
 
     if (!editingInput || tabId === null) return
 
-    const message: UpdateInputValueMessage & { tabId: number } = {
-      type: "UPDATE_INPUT_VALUE",
+    const message: UpdateInputValueMessageWithTab = {
+      type: MESSAGE_TYPES.UPDATE_INPUT_VALUE as "UPDATE_INPUT_VALUE",
       tabId,
       frameId: editingInput.frameId,
       xpath: editingInput.xpath,
@@ -175,25 +136,19 @@ function IndexPopup() {
     if (sendMessage(message)) {
       setEditingInput(null)
     } else {
-      setError("接続が切断されました")
+      setError(ERROR_MESSAGES.CONNECTION_LOST)
     }
   }
 
-  const handleCancel = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setEditingInput(null)
-  }
-
-  const totalInputs = frameInputs.reduce(
-    (sum, frame) => sum + frame.inputs.length,
-    0
+  const panelClasses = cn(
+    `w-[${UI_CONFIG.PANEL_WIDTH}] max-h-[${UI_CONFIG.PANEL_MAX_HEIGHT}]`,
+    "overflow-auto bg-bg-primary"
   )
 
   if (loading) {
     return (
-      <div className="popup-container">
-        <div className="loading">読み込み中...</div>
+      <div className={panelClasses}>
+        <div className="p-6 text-center text-text-secondary">読み込み中...</div>
       </div>
     )
   }
@@ -207,16 +162,13 @@ function IndexPopup() {
   if (error) {
     const needsReload = error.includes("リロード")
     return (
-      <div className="popup-container">
-        <div className="error">
-          <p>{error}</p>
+      <div className={panelClasses}>
+        <div className="p-4 text-red-500 text-[13px]">
+          <p className="m-0 mb-3">{error}</p>
           {needsReload && (
-            <button
-              type="button"
-              className="btn btn--primary reload-btn"
-              onClick={handleReloadPage}>
+            <Button className="w-full" onClick={handleReloadPage}>
               ページをリロード
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -227,7 +179,7 @@ function IndexPopup() {
     if (tabId === null) return
 
     const message: TogglePinMessage = {
-      type: "TOGGLE_PIN",
+      type: MESSAGE_TYPES.TOGGLE_PIN as "TOGGLE_PIN",
       tabId,
       pinned: true
     }
@@ -238,42 +190,40 @@ function IndexPopup() {
         // Wait a bit for overlay to initialize before closing popup
         setTimeout(() => {
           window.close()
-        }, 100)
+        }, TIMING.OVERLAY_CLOSE_DELAY_MS)
       } else if (response?.error === "CONTENT_SCRIPT_NOT_LOADED") {
-        setError(
-          "ページをリロードしてください。拡張機能のコンテンツスクリプトがまだ読み込まれていません。"
-        )
+        setError(ERROR_MESSAGES.CONTENT_SCRIPT_NOT_LOADED)
       } else {
-        setError("固定表示に失敗しました")
+        setError(ERROR_MESSAGES.PIN_FAILED)
       }
     } catch {
-      setError("固定表示に失敗しました")
+      setError(ERROR_MESSAGES.PIN_FAILED)
     }
   }
 
   return (
-    <div className="popup-container">
-      <div className="popup-header">
-        <div className="popup-header-content">
-          <h1 className="popup-title">Hidden Input Viewer</h1>
-          <p className="popup-subtitle">
+    <div className={panelClasses}>
+      <div className="sticky top-0 z-10 flex items-center gap-2 bg-bg-primary border-b border-border-default px-4 py-3 shadow-sm">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-base font-bold text-text-primary m-0">
+            Hidden Input Viewer
+          </h1>
+          <p className="text-xs text-text-secondary mt-0.5">
             {totalInputs}個のhidden inputを検出
             {frameInputs.length > 1 && ` (${frameInputs.length}フレーム)`}
           </p>
         </div>
-        <button
-          type="button"
-          className="pin-btn"
-          onClick={handlePin}
-          title="ページに固定表示">
+        <Button variant="icon" onClick={handlePin} title="ページに固定表示">
           <PinIcon />
-        </button>
+        </Button>
       </div>
 
       {frameInputs.length === 0 ? (
-        <div className="empty-state">フレームが見つかりません</div>
+        <div className="p-3 text-center text-text-tertiary text-[13px] italic bg-bg-primary">
+          フレームが見つかりません
+        </div>
       ) : (
-        <div className="frame-list">
+        <div className="flex flex-col">
           {frameInputs.map((frameData) => (
             <FrameSection
               key={frameData.frame.frameId}
@@ -282,9 +232,7 @@ function IndexPopup() {
               onToggle={() => toggleFrame(frameData.frame.frameId)}
               editingInput={editingInput}
               onEdit={handleEdit}
-              onEditChange={(value) =>
-                editingInput && setEditingInput({ ...editingInput, value })
-              }
+              onEditChange={handleEditChange}
               onSave={handleSave}
               onCancel={handleCancel}
             />

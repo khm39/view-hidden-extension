@@ -2,16 +2,15 @@ import cssText from "data-text:~overlay.css"
 import type { PlasmoCSConfig, PlasmoGetStyle } from "plasmo"
 import { useEffect, useRef, useState } from "react"
 
-import {
-  FrameSection,
-  sortFrameInputs,
-  type EditingInput
-} from "~components/shared"
-import type {
-  FrameHiddenInputs,
-  PinStateMessage,
-  UpdateInputValueMessage
-} from "~types"
+import { Button } from "~components/Button"
+import { FrameSection } from "~components/FrameSection"
+import { CloseIcon, DragIcon } from "~components/icons"
+import { useHiddenInputs } from "~hooks/useHiddenInputs"
+import type { PinStateMessage, UpdateInputValueMessage } from "~types"
+import { cn } from "~utils/cn"
+import { MESSAGE_TYPES, TIMING, UI_CONFIG } from "~utils/constants"
+import { isExtensionContextValid } from "~utils/extension"
+import { logger } from "~utils/logger"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -25,65 +24,34 @@ export const getStyle: PlasmoGetStyle = () => {
   return style
 }
 
-function CloseIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg">
-      <path
-        d="M4 4L12 12M12 4L4 12"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function DragIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg">
-      <circle cx="5" cy="4" r="1.5" fill="currentColor" />
-      <circle cx="11" cy="4" r="1.5" fill="currentColor" />
-      <circle cx="5" cy="8" r="1.5" fill="currentColor" />
-      <circle cx="11" cy="8" r="1.5" fill="currentColor" />
-      <circle cx="5" cy="12" r="1.5" fill="currentColor" />
-      <circle cx="11" cy="12" r="1.5" fill="currentColor" />
-    </svg>
-  )
-}
-
 function Overlay() {
   const [visible, setVisible] = useState(false)
-  const [frameInputs, setFrameInputs] = useState<FrameHiddenInputs[]>([])
-  const [expandedFrames, setExpandedFrames] = useState<Set<number>>(new Set())
-  const [editingInput, setEditingInput] = useState<EditingInput | null>(null)
   const [position, setPosition] = useState({ x: 20, y: 20 })
   const [isDragging, setIsDragging] = useState(false)
   const dragOffset = useRef({ x: 0, y: 0 })
   const overlayRef = useRef<HTMLDivElement>(null)
 
+  const {
+    frameInputs,
+    expandedFrames,
+    editingInput,
+    totalInputs,
+    toggleFrame,
+    handleEdit,
+    handleEditChange,
+    handleCancel,
+    setEditingInput,
+    updateFrameData
+  } = useHiddenInputs({ collapseOnInitialLoad: false })
+
   useEffect(() => {
-    // Check if extension context is valid
-    if (!chrome.runtime?.id) {
-      return
-    }
+    if (!isExtensionContextValid()) return
 
     const handleMessage = (message: PinStateMessage) => {
-      if (message.type === "PIN_STATE") {
+      if (message.type === MESSAGE_TYPES.PIN_STATE) {
         setVisible(message.pinned)
         if (message.data) {
-          const sorted = sortFrameInputs(message.data)
-          setFrameInputs(sorted)
+          updateFrameData(message.data)
         }
       }
     }
@@ -91,25 +59,23 @@ function Overlay() {
     chrome.runtime.onMessage.addListener(handleMessage)
 
     // Check if this tab is pinned (for page navigation case)
-    // Delay slightly to ensure extension context is ready
     const checkPinState = () => {
-      // Check if extension context is still valid
-      if (!chrome.runtime?.id) {
-        return
-      }
-      chrome.runtime.sendMessage({ type: "CHECK_PIN_STATE" }).catch(() => {
-        // Extension context invalidated
-      })
+      if (!isExtensionContextValid()) return
+      chrome.runtime
+        .sendMessage({ type: MESSAGE_TYPES.CHECK_PIN_STATE })
+        .catch((e) => {
+          logger.error("checkPinState", e)
+        })
     }
 
     // Small delay to avoid race condition on initial load
-    const timerId = setTimeout(checkPinState, 100)
+    const timerId = setTimeout(checkPinState, TIMING.PIN_CHECK_DELAY_MS)
 
     return () => {
       clearTimeout(timerId)
       chrome.runtime.onMessage.removeListener(handleMessage)
     }
-  }, [])
+  }, [updateFrameData])
 
   useEffect(() => {
     if (!isDragging) return
@@ -146,24 +112,7 @@ function Overlay() {
 
   const handleClose = () => {
     setVisible(false)
-    chrome.runtime.sendMessage({ type: "UNPIN_OVERLAY" })
-  }
-
-  const toggleFrame = (frameId: number) => {
-    setExpandedFrames((prev) => {
-      const next = new Set(prev)
-      if (next.has(frameId)) {
-        next.delete(frameId)
-      } else {
-        next.add(frameId)
-      }
-      return next
-    })
-  }
-
-  const handleEdit = (frameId: number, xpath: string, currentValue: string) => {
-    setEditingInput({ frameId, xpath, value: currentValue })
-    setExpandedFrames((prev) => new Set(prev).add(frameId))
+    chrome.runtime.sendMessage({ type: MESSAGE_TYPES.UNPIN_OVERLAY })
   }
 
   const handleSave = async (e: React.MouseEvent) => {
@@ -172,7 +121,7 @@ function Overlay() {
     if (!editingInput) return
 
     const message: UpdateInputValueMessage = {
-      type: "UPDATE_INPUT_VALUE",
+      type: MESSAGE_TYPES.UPDATE_INPUT_VALUE as "UPDATE_INPUT_VALUE",
       frameId: editingInput.frameId,
       xpath: editingInput.xpath,
       value: editingInput.value
@@ -182,52 +131,54 @@ function Overlay() {
     setEditingInput(null)
   }
 
-  const handleCancel = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setEditingInput(null)
-  }
-
   if (!visible) return null
 
-  const totalInputs = frameInputs.reduce(
-    (sum, frame) => sum + frame.inputs.length,
-    0
+  const containerClasses = cn(
+    `fixed z-[${UI_CONFIG.OVERLAY_Z_INDEX}] w-[${UI_CONFIG.PANEL_WIDTH}] max-h-[${UI_CONFIG.PANEL_MAX_HEIGHT}]`,
+    "bg-bg-primary rounded-xl shadow-overlay",
+    "font-sans text-sm text-text-primary",
+    "overflow-hidden flex flex-col"
+  )
+
+  const headerClasses = cn(
+    "flex items-center gap-2 px-4 py-3",
+    "bg-bg-secondary border-b border-border-default",
+    "cursor-grab select-none active:cursor-grabbing"
   )
 
   return (
     <div
       ref={overlayRef}
-      className="overlay-container"
+      className={containerClasses}
       style={{
         left: position.x,
         top: position.y
       }}>
-      <div className="overlay-header" onMouseDown={handleDragStart}>
-        <div className="overlay-drag-handle">
+      <div className={headerClasses} onMouseDown={handleDragStart}>
+        <div className="text-text-tertiary shrink-0">
           <DragIcon />
         </div>
-        <div className="overlay-header-content">
-          <h1 className="overlay-title">Hidden Input Viewer</h1>
-          <p className="overlay-subtitle">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-sm font-bold m-0 text-text-primary">
+            Hidden Input Viewer
+          </h1>
+          <p className="text-[11px] text-text-secondary mt-0.5">
             {totalInputs}個のhidden inputを検出
             {frameInputs.length > 1 && ` (${frameInputs.length}フレーム)`}
           </p>
         </div>
-        <button
-          type="button"
-          className="overlay-close-btn"
-          onClick={handleClose}
-          title="閉じる">
+        <Button variant="icon-ghost" onClick={handleClose} title="閉じる">
           <CloseIcon />
-        </button>
+        </Button>
       </div>
 
-      <div className="overlay-body">
+      <div className="overlay-body flex-1 overflow-y-auto">
         {frameInputs.length === 0 ? (
-          <div className="overlay-empty">フレームが見つかりません</div>
+          <div className="p-6 text-center text-text-tertiary italic">
+            フレームが見つかりません
+          </div>
         ) : (
-          <div className="overlay-frame-list">
+          <div className="flex flex-col">
             {frameInputs.map((frameData) => (
               <FrameSection
                 key={frameData.frame.frameId}
@@ -236,12 +187,9 @@ function Overlay() {
                 onToggle={() => toggleFrame(frameData.frame.frameId)}
                 editingInput={editingInput}
                 onEdit={handleEdit}
-                onEditChange={(value) =>
-                  editingInput && setEditingInput({ ...editingInput, value })
-                }
+                onEditChange={handleEditChange}
                 onSave={handleSave}
                 onCancel={handleCancel}
-                classPrefix="overlay"
               />
             ))}
           </div>

@@ -6,82 +6,15 @@ import type {
   HiddenInputsUpdateMessage,
   UpdateInputValueMessage
 } from "~types"
+import { MESSAGE_TYPES, TIMING } from "~utils/constants"
+import { isExtensionContextValid } from "~utils/extension"
+import { logger } from "~utils/logger"
+import { getElementByXPath, getXPath } from "~utils/xpath"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
   all_frames: true,
   run_at: "document_idle"
-}
-
-// XPath文字列のエスケープ処理
-// XPathではクォートを含む文字列にはconcat()を使用する必要がある
-function escapeXPathString(str: string): string {
-  // クォートを含まない場合はそのままダブルクォートで囲む
-  if (!str.includes('"')) {
-    return `"${str}"`
-  }
-  // ダブルクォートのみ含む場合はシングルクォートで囲む
-  if (!str.includes("'")) {
-    return `'${str}'`
-  }
-  // 両方含む場合はconcat()を使用
-  // 例: "it's \"quoted\"" → concat("it's ", '"', "quoted", '"')
-  const parts: string[] = []
-  let current = ""
-  for (const char of str) {
-    if (char === '"') {
-      if (current) {
-        parts.push(`"${current}"`)
-        current = ""
-      }
-      parts.push(`'"'`)
-    } else {
-      current += char
-    }
-  }
-  if (current) {
-    parts.push(`"${current}"`)
-  }
-  return `concat(${parts.join(", ")})`
-}
-
-function getXPath(element: Element): string {
-  if (element.id) {
-    return `//*[@id=${escapeXPathString(element.id)}]`
-  }
-
-  const parts: string[] = []
-  let current: Element | null = element
-
-  while (current && current.nodeType === Node.ELEMENT_NODE) {
-    let index = 1
-    let sibling = current.previousElementSibling
-
-    while (sibling) {
-      if (sibling.nodeName === current.nodeName) {
-        index++
-      }
-      sibling = sibling.previousElementSibling
-    }
-
-    const tagName = current.nodeName.toLowerCase()
-    const part = index > 1 ? `${tagName}[${index}]` : tagName
-    parts.unshift(part)
-    current = current.parentElement
-  }
-
-  return "/" + parts.join("/")
-}
-
-function getElementByXPath(xpath: string): Element | null {
-  const result = document.evaluate(
-    xpath,
-    document,
-    null,
-    XPathResult.FIRST_ORDERED_NODE_TYPE,
-    null
-  )
-  return result.singleNodeValue as Element | null
 }
 
 function collectHiddenInputs(): HiddenInputInfo[] {
@@ -124,21 +57,18 @@ function getFrameName(): string | null {
 }
 
 function sendHiddenInputsUpdate() {
-  // Check if extension context is still valid
-  if (!chrome.runtime?.id) {
-    return
-  }
+  if (!isExtensionContextValid()) return
 
   const inputs = collectHiddenInputs()
   const message: HiddenInputsUpdateMessage = {
-    type: "HIDDEN_INPUTS_UPDATE",
-    frameId: 0, // Will be set by background script
+    type: MESSAGE_TYPES.HIDDEN_INPUTS_UPDATE as "HIDDEN_INPUTS_UPDATE",
+    frameId: 0, // frameIdはbackground scriptがsender.frameIdから取得
     url: window.location.href,
     frameName: getFrameName(),
     inputs
   }
-  chrome.runtime.sendMessage(message).catch(() => {
-    // Extension context invalidated (extension was reloaded)
+  chrome.runtime.sendMessage(message).catch((e) => {
+    logger.error("sendHiddenInputsUpdate", e)
   })
 }
 
@@ -151,7 +81,7 @@ function debouncedUpdate() {
   debounceTimer = setTimeout(() => {
     sendHiddenInputsUpdate()
     debounceTimer = null
-  }, 100)
+  }, TIMING.DEBOUNCE_MS)
 }
 
 const observer = new MutationObserver((mutations) => {
@@ -203,19 +133,28 @@ const observer = new MutationObserver((mutations) => {
   }
 })
 
-observer.observe(document.body, {
-  childList: true,
-  subtree: true,
-  attributes: true,
-  attributeFilter: ["value", "name", "id", "type"]
-})
+// Start observing when document.body is available
+function startObserver() {
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["value", "name", "id", "type"]
+  })
+}
+
+if (document.body) {
+  startObserver()
+} else {
+  document.addEventListener("DOMContentLoaded", startObserver)
+}
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message.type === "GET_HIDDEN_INPUTS") {
+  if (message.type === MESSAGE_TYPES.GET_HIDDEN_INPUTS) {
     const inputs = collectHiddenInputs()
     const response: HiddenInputsResultMessage = {
-      type: "HIDDEN_INPUTS_RESULT",
-      frameId: 0, // Will be set by background script
+      type: MESSAGE_TYPES.HIDDEN_INPUTS_RESULT as "HIDDEN_INPUTS_RESULT",
+      frameId: 0, // frameIdはbackground scriptがsender.frameIdから取得
       url: window.location.href,
       frameName: getFrameName(),
       inputs
@@ -224,7 +163,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true
   }
 
-  if (message.type === "UPDATE_INPUT_VALUE") {
+  if (message.type === MESSAGE_TYPES.UPDATE_INPUT_VALUE) {
     const updateMessage = message as UpdateInputValueMessage
     const element = getElementByXPath(updateMessage.xpath)
 

@@ -65,3 +65,63 @@ export interface PinStateMessage {
 export interface CheckPinStateMessage {
   type: "CHECK_PIN_STATE"
 }
+
+// tabId付きメッセージ型
+export interface UpdateInputValueMessageWithTab extends UpdateInputValueMessage {
+  tabId: number
+}
+
+export interface UnpinOverlayMessage {
+  type: "UNPIN_OVERLAY"
+}
+
+export interface GetHiddenInputsMessage {
+  type: "GET_HIDDEN_INPUTS"
+}
+
+export interface SubscribeUpdatesMessage {
+  type: "SUBSCRIBE_UPDATES"
+  tabId: number
+}
+
+// Background script が受け取るメッセージの統合型
+export type BackgroundMessage =
+  | HiddenInputsUpdateMessage
+  | TogglePinMessage
+  | UnpinOverlayMessage
+  | CheckPinStateMessage
+  | UpdateInputValueMessage
+  | UpdateInputValueMessageWithTab
+
+// Content script が受け取るメッセージの統合型
+export type ContentScriptMessage =
+  | GetHiddenInputsMessage
+  | UpdateInputValueMessage
+  | PinStateMessage
+
+// Port経由で受け取るメッセージの統合型
+export type PopupPortMessage =
+  | SubscribeUpdatesMessage
+  | UpdateInputValueMessageWithTab
+
+// 型ガード関数
+export function isHiddenInputsResultMessage(
+  response: unknown
+): response is HiddenInputsResultMessage {
+  return (
+    typeof response === "object" &&
+    response !== null &&
+    "type" in response &&
+    (response as { type: string }).type === "HIDDEN_INPUTS_RESULT"
+  )
+}
+
+export function isPortMessage(message: unknown): message is PortMessage {
+  if (typeof message !== "object" || message === null) return false
+  const msg = message as { type?: string }
+  return (
+    msg.type === "ALL_FRAMES_DATA" ||
+    msg.type === "FRAME_DATA" ||
+    msg.type === "UPDATE_RESULT"
+  )
+}
