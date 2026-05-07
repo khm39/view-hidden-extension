@@ -32,7 +32,8 @@
     ],
     "permissions": [
       "activeTab",
-      "webNavigation"
+      "webNavigation",
+      "contextMenus"
     ]
   }
 }
