@@ -58,3 +58,10 @@ export const ERROR_MESSAGES = {
     "ページをリロードしてください。拡張機能のコンテンツスクリプトがまだ読み込まれていません。",
   CONNECTION_LOST: "接続が切断されました"
 } as const
+
+/**
+ * コンテキストメニュー定数
+ */
+export const CONTEXT_MENU_IDS = {
+  SHOW_OVERLAY: "view-hidden-show-overlay"
+} as const

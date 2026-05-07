@@ -17,7 +17,7 @@ import type {
   TogglePinMessage,
   UpdateInputValueMessage
 } from "~types"
-import { MESSAGE_TYPES } from "~utils/constants"
+import { CONTEXT_MENU_IDS, MESSAGE_TYPES } from "~utils/constants"
 import { logger } from "~utils/logger"
 
 async function handleUpdateMessage(
@@ -122,6 +122,34 @@ chrome.runtime.onConnect.addListener((port) => {
       unregisterPopupPort(port)
     })
   }
+})
+
+// 拡張機能アイコンが表示されないサブウィンドウ等からも起動できるよう、右クリックメニューを登録
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: CONTEXT_MENU_IDS.SHOW_OVERLAY,
+      title: "Hidden Input Viewer を表示",
+      contexts: ["page", "frame", "selection", "link", "editable", "image"]
+    })
+  })
+})
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId !== CONTEXT_MENU_IDS.SHOW_OVERLAY) return
+  if (!tab?.id) return
+
+  const message: TogglePinMessage = {
+    type: MESSAGE_TYPES.TOGGLE_PIN as "TOGGLE_PIN",
+    tabId: tab.id,
+    pinned: true
+  }
+
+  handleTogglePin(message, (response) => {
+    if (!response.success) {
+      logger.error("contextMenus.onClicked", response.error)
+    }
+  })
 })
 
 // Clean up when tab is closed
