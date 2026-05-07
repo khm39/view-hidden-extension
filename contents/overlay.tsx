@@ -8,7 +8,7 @@ import { CloseIcon, DragIcon } from "~components/icons"
 import { useHiddenInputs } from "~hooks/useHiddenInputs"
 import type { PinStateMessage, UpdateInputValueMessage } from "~types"
 import { cn } from "~utils/cn"
-import { MESSAGE_TYPES, TIMING, UI_CONFIG } from "~utils/constants"
+import { MESSAGE_TYPES, TIMING } from "~utils/constants"
 import { isExtensionContextValid } from "~utils/extension"
 import { logger } from "~utils/logger"
 
@@ -134,7 +134,7 @@ function Overlay() {
   if (!visible) return null
 
   const containerClasses = cn(
-    `fixed z-[${UI_CONFIG.OVERLAY_Z_INDEX}] w-[${UI_CONFIG.PANEL_WIDTH}] max-h-[${UI_CONFIG.PANEL_MAX_HEIGHT}]`,
+    "fixed z-[2147483647] w-[400px] max-h-[500px]",
     "bg-bg-primary rounded-xl shadow-overlay",
     "font-sans text-sm text-text-primary",
     "overflow-hidden flex flex-col"
