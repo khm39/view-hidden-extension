@@ -8,6 +8,28 @@ import type { InputRowProps } from "./types"
 
 const PASSWORD_MASK = "••••••••"
 
+interface BadgeProps {
+  label: string
+  variant: "warning" | "info"
+}
+
+function AttributeBadge({ label, variant }: BadgeProps) {
+  const variantClasses =
+    variant === "warning"
+      ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+      : "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30"
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center px-1.5 py-px rounded border",
+        "text-[10px] font-medium uppercase tracking-wide leading-none",
+        variantClasses
+      )}>
+      {label}
+    </span>
+  )
+}
+
 export function InputRow({
   input,
   isEditing,
@@ -21,14 +43,38 @@ export function InputRow({
   const displayName = input.name || input.id || "(名前なし)"
   const [revealPassword, setRevealPassword] = useState(false)
 
+  const isUneditable = input.disabled || input.readonly
+  const uneditableReason = input.disabled ? "disabled" : "readonly"
+
   const containerClasses =
     "px-3 py-2.5 border-b border-border-default last:border-b-0 transition-colors duration-150 hover:bg-bg-hover"
 
+  const badges = (
+    <>
+      {input.required && <AttributeBadge label="required" variant="info" />}
+      {input.readonly && <AttributeBadge label="readonly" variant="warning" />}
+      {input.disabled && <AttributeBadge label="disabled" variant="warning" />}
+    </>
+  )
+
   const header = (
     <>
-      <div className="text-[13px] font-medium text-text-primary break-all">
-        {displayName}
+      <div className="flex items-center flex-wrap gap-1.5">
+        <div className="text-[13px] font-medium text-text-primary break-all">
+          {displayName}
+        </div>
+        {badges}
       </div>
+      {input.label && (
+        <div className="text-[11px] text-text-secondary mt-0.5 break-all">
+          label: {input.label}
+        </div>
+      )}
+      {input.placeholder && (
+        <div className="text-[11px] text-text-tertiary mt-0.5 break-all">
+          placeholder: {input.placeholder}
+        </div>
+      )}
       {input.formName && (
         <div className="text-[11px] text-text-tertiary mt-0.5">
           form: {input.formName}
@@ -43,14 +89,22 @@ export function InputRow({
     return (
       <div className={containerClasses}>
         {header}
-        <label className="flex items-center gap-2 mt-1.5 cursor-pointer select-none">
+        <label
+          className={cn(
+            "flex items-center gap-2 mt-1.5 select-none",
+            isUneditable ? "cursor-not-allowed opacity-70" : "cursor-pointer"
+          )}>
           <input
             type="checkbox"
             checked={isChecked}
+            disabled={isUneditable}
             onChange={(e) =>
               onImmediateSave(e.target.checked ? "true" : "false")
             }
-            className="w-4 h-4 cursor-pointer"
+            className={cn(
+              "w-4 h-4",
+              isUneditable ? "cursor-not-allowed" : "cursor-pointer"
+            )}
             aria-label={`${displayName}のチェック状態を切替`}
           />
           <span className="text-xs font-mono text-text-secondary">
@@ -75,6 +129,27 @@ export function InputRow({
           {input.value || "(ファイル未選択)"}
           <div className="text-[11px] not-italic mt-1 text-text-muted">
             file 入力は編集できません
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // disabled / readonly: 編集不可（値は表示するがクリックで編集モードに入らない）
+  if (isUneditable) {
+    return (
+      <div className={containerClasses}>
+        {header}
+        <div
+          className={cn(
+            "mt-1.5 px-2.5 py-2 bg-bg-input rounded-md",
+            "font-mono text-xs text-text-tertiary break-all leading-relaxed",
+            !input.value && "italic"
+          )}
+          aria-label={`${displayName} (${uneditableReason} のため編集不可)`}>
+          {input.value || "(空)"}
+          <div className="text-[11px] mt-1 text-text-muted">
+            {uneditableReason} 属性のため編集できません
           </div>
         </div>
       </div>
