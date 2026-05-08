@@ -1,0 +1,9 @@
+build/
+dist/
+out/
+.plasmo/
+node_modules/
+coverage/
+playwright-report/
+test-results/
+pnpm-lock.yaml
