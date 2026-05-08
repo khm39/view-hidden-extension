@@ -98,6 +98,7 @@
 /* Base body styles */
 body {
   @apply bg-bg-primary text-text-primary font-sans;
+  min-width: 400px;
 }
 
 /* Scrollbar styling */
