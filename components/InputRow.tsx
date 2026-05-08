@@ -91,22 +91,52 @@ export function InputRow({
         {header}
         <label
           className={cn(
-            "flex items-center gap-2 mt-1.5 select-none",
+            "group inline-flex items-center gap-2 mt-1.5 select-none",
             isUneditable ? "cursor-not-allowed opacity-70" : "cursor-pointer"
           )}>
-          <input
-            type="checkbox"
-            checked={isChecked}
-            disabled={isUneditable}
-            onChange={(e) =>
-              onImmediateSave(e.target.checked ? "true" : "false")
-            }
-            className={cn(
-              "w-4 h-4",
-              isUneditable ? "cursor-not-allowed" : "cursor-pointer"
-            )}
-            aria-label={`${displayName}のチェック状態を切替`}
-          />
+          <span className="relative inline-flex shrink-0">
+            <input
+              type="checkbox"
+              checked={isChecked}
+              disabled={isUneditable}
+              onChange={(e) =>
+                onImmediateSave(e.target.checked ? "true" : "false")
+              }
+              className="peer sr-only"
+              aria-label={`${displayName}のチェック状態を切替`}
+            />
+            <span
+              aria-hidden="true"
+              className={cn(
+                "w-[18px] h-[18px] rounded-md border-2",
+                "flex items-center justify-center",
+                "transition-colors duration-150",
+                isChecked
+                  ? "border-accent bg-accent"
+                  : "border-input-border bg-input-bg",
+                !isUneditable &&
+                  !isChecked &&
+                  "group-hover:border-input-border-focus",
+                "peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-focus-visible:ring-offset-1 peer-focus-visible:ring-offset-bg-primary"
+              )}>
+              <svg
+                viewBox="0 0 16 16"
+                className={cn(
+                  "w-3 h-3 text-white transition-all duration-150",
+                  isChecked ? "opacity-100 scale-100" : "opacity-0 scale-50"
+                )}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                aria-hidden="true">
+                <path
+                  d="M3 8.5L6.5 12L13 4.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+          </span>
           <span className="text-xs font-mono text-text-secondary">
             {isChecked ? "checked" : "unchecked"}
           </span>
