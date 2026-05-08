@@ -17,6 +17,7 @@ export interface FrameSectionProps {
   onEditChange: (value: string) => void
   onSave: (e: React.MouseEvent) => void
   onCancel: (e: React.MouseEvent) => void
+  onImmediateSave: (frameId: number, xpath: string, value: string) => void
 }
 
 // フレームヘッダーのProps
@@ -36,10 +37,12 @@ export interface InputRowProps {
   onEditChange: (value: string) => void
   onSave: (e: React.MouseEvent) => void
   onCancel: (e: React.MouseEvent) => void
+  onImmediateSave: (value: string) => void
 }
 
 // 編集フォームのProps
 export interface InputEditFormProps {
+  input: HiddenInputInfo
   value: string
   onChange: (value: string) => void
   onSave: (e: React.MouseEvent) => void

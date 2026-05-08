@@ -3,6 +3,7 @@ import type { PlasmoCSConfig, PlasmoGetStyle } from "plasmo"
 import { useEffect, useRef, useState } from "react"
 
 import { Button } from "~components/Button"
+import { DisplayModeToggle } from "~components/DisplayModeToggle"
 import { FrameSection } from "~components/FrameSection"
 import { CloseIcon, DragIcon } from "~components/icons"
 import { useHiddenInputs } from "~hooks/useHiddenInputs"
@@ -32,10 +33,15 @@ function Overlay() {
   const overlayRef = useRef<HTMLDivElement>(null)
 
   const {
-    frameInputs,
+    filteredFrameInputs,
     expandedFrames,
     editingInput,
     totalInputs,
+    totalCounts,
+    displayMode,
+    setDisplayMode,
+    searchQuery,
+    setSearchQuery,
     toggleFrame,
     handleEdit,
     handleEditChange,
@@ -131,6 +137,20 @@ function Overlay() {
     setEditingInput(null)
   }
 
+  const handleImmediateSave = (
+    frameId: number,
+    xpath: string,
+    value: string
+  ) => {
+    const message: UpdateInputValueMessage = {
+      type: MESSAGE_TYPES.UPDATE_INPUT_VALUE as "UPDATE_INPUT_VALUE",
+      frameId,
+      xpath,
+      value
+    }
+    chrome.runtime.sendMessage(message)
+  }
+
   if (!visible) return null
 
   const containerClasses = cn(
@@ -163,8 +183,9 @@ function Overlay() {
             Hidden Input Viewer
           </h1>
           <p className="text-[11px] text-text-secondary mt-0.5">
-            {totalInputs}個のhidden inputを検出
-            {frameInputs.length > 1 && ` (${frameInputs.length}フレーム)`}
+            {totalInputs}個の入力欄を表示中
+            {filteredFrameInputs.length > 1 &&
+              ` (${filteredFrameInputs.length}フレーム)`}
           </p>
         </div>
         <Button variant="icon-ghost" onClick={handleClose} title="閉じる">
@@ -172,14 +193,38 @@ function Overlay() {
         </Button>
       </div>
 
+      <div
+        className="px-4 py-2 border-b border-border-default bg-bg-primary"
+        onMouseDown={(e) => e.stopPropagation()}>
+        <DisplayModeToggle
+          mode={displayMode}
+          counts={totalCounts}
+          onChange={setDisplayMode}
+        />
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="name / value / type で検索"
+          aria-label="入力欄を検索"
+          className={cn(
+            "w-full mt-2 px-2.5 py-1.5",
+            "bg-input-bg border border-input-border rounded-md",
+            "text-xs text-text-primary",
+            "placeholder:text-text-tertiary",
+            "focus:outline-none focus:border-input-border-focus"
+          )}
+        />
+      </div>
+
       <div className="overlay-body flex-1 overflow-y-auto">
-        {frameInputs.length === 0 ? (
+        {filteredFrameInputs.length === 0 ? (
           <div className="p-6 text-center text-text-tertiary italic">
             フレームが見つかりません
           </div>
         ) : (
           <div className="flex flex-col">
-            {frameInputs.map((frameData) => (
+            {filteredFrameInputs.map((frameData) => (
               <FrameSection
                 key={frameData.frame.frameId}
                 frameData={frameData}
@@ -190,6 +235,7 @@ function Overlay() {
                 onEditChange={handleEditChange}
                 onSave={handleSave}
                 onCancel={handleCancel}
+                onImmediateSave={handleImmediateSave}
               />
             ))}
           </div>

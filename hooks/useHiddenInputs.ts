@@ -1,20 +1,35 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import type { EditingInput } from "~components/types"
-import type { FrameHiddenInputs, PortMessage } from "~types"
-import { MESSAGE_TYPES } from "~utils/constants"
+import type { DisplayMode, FrameHiddenInputs, PortMessage } from "~types"
+import { DISPLAY_MODES, MESSAGE_TYPES, STORAGE_KEYS } from "~utils/constants"
 import { sortFrameInputs } from "~utils/frameSort"
+import { logger } from "~utils/logger"
 
 export interface UseHiddenInputsOptions {
   /** 初回読み込み時にすべてのフレームを閉じるかどうか */
   collapseOnInitialLoad?: boolean
+  /** 表示モードの初期値 */
+  initialDisplayMode?: DisplayMode
+}
+
+export interface InputCounts {
+  hidden: number
+  visible: number
+  all: number
 }
 
 export interface UseHiddenInputsReturn {
   frameInputs: FrameHiddenInputs[]
+  filteredFrameInputs: FrameHiddenInputs[]
   expandedFrames: Set<number>
   editingInput: EditingInput | null
   totalInputs: number
+  totalCounts: InputCounts
+  displayMode: DisplayMode
+  setDisplayMode: (mode: DisplayMode) => void
+  searchQuery: string
+  setSearchQuery: (query: string) => void
   toggleFrame: (frameId: number) => void
   handleEdit: (frameId: number, xpath: string, currentValue: string) => void
   handleEditChange: (value: string) => void
@@ -27,19 +42,107 @@ export interface UseHiddenInputsReturn {
   updateFrameData: (data: FrameHiddenInputs[]) => void
 }
 
+function isDisplayMode(value: unknown): value is DisplayMode {
+  return (
+    value === DISPLAY_MODES.HIDDEN ||
+    value === DISPLAY_MODES.VISIBLE ||
+    value === DISPLAY_MODES.ALL
+  )
+}
+
 export function useHiddenInputs(
   options: UseHiddenInputsOptions = {}
 ): UseHiddenInputsReturn {
-  const { collapseOnInitialLoad = true } = options
+  const {
+    collapseOnInitialLoad = true,
+    initialDisplayMode = DISPLAY_MODES.HIDDEN
+  } = options
 
   const [frameInputs, setFrameInputs] = useState<FrameHiddenInputs[]>([])
   const [expandedFrames, setExpandedFrames] = useState<Set<number>>(new Set())
   const [editingInput, setEditingInput] = useState<EditingInput | null>(null)
+  const [displayMode, setDisplayMode] =
+    useState<DisplayMode>(initialDisplayMode)
+  const [searchQuery, setSearchQuery] = useState("")
+  const hasLoadedStorageRef = useRef(false)
+
+  // chrome.storage.session から displayMode を復元
+  useEffect(() => {
+    let cancelled = false
+    chrome.storage.session
+      .get([STORAGE_KEYS.DISPLAY_MODE])
+      .then((data) => {
+        if (cancelled) return
+        const stored = data[STORAGE_KEYS.DISPLAY_MODE]
+        if (isDisplayMode(stored)) {
+          setDisplayMode(stored)
+        }
+      })
+      .catch((e) => {
+        logger.error("useHiddenInputs:loadDisplayMode", e)
+      })
+      .finally(() => {
+        hasLoadedStorageRef.current = true
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // displayMode 変更を chrome.storage.session に保存
+  useEffect(() => {
+    if (!hasLoadedStorageRef.current) return
+    chrome.storage.session
+      .set({ [STORAGE_KEYS.DISPLAY_MODE]: displayMode })
+      .catch((e) => {
+        logger.error("useHiddenInputs:saveDisplayMode", e)
+      })
+  }, [displayMode])
+
+  // 全件のカウント（モードに依らない）
+  const totalCounts = useMemo<InputCounts>(() => {
+    let hidden = 0
+    let visible = 0
+    for (const frame of frameInputs) {
+      for (const input of frame.inputs) {
+        if (input.isVisuallyHidden) hidden++
+        else visible++
+      }
+    }
+    return { hidden, visible, all: hidden + visible }
+  }, [frameInputs])
+
+  // 表示モード + 検索クエリでフィルタしたフレームデータ
+  const filteredFrameInputs = useMemo<FrameHiddenInputs[]>(() => {
+    const trimmed = searchQuery.trim().toLowerCase()
+    return frameInputs.map((frame) => ({
+      ...frame,
+      inputs: frame.inputs.filter((input) => {
+        if (displayMode === DISPLAY_MODES.HIDDEN && !input.isVisuallyHidden) {
+          return false
+        }
+        if (displayMode === DISPLAY_MODES.VISIBLE && input.isVisuallyHidden) {
+          return false
+        }
+        if (!trimmed) return true
+        return (
+          input.name.toLowerCase().includes(trimmed) ||
+          input.value.toLowerCase().includes(trimmed) ||
+          input.type.toLowerCase().includes(trimmed) ||
+          input.id.toLowerCase().includes(trimmed) ||
+          (input.formName?.toLowerCase().includes(trimmed) ?? false) ||
+          (input.label?.toLowerCase().includes(trimmed) ?? false) ||
+          (input.placeholder?.toLowerCase().includes(trimmed) ?? false)
+        )
+      })
+    }))
+  }, [frameInputs, displayMode, searchQuery])
 
   // メモ化: frameInputsが変更された時のみ再計算
   const totalInputs = useMemo(
-    () => frameInputs.reduce((sum, frame) => sum + frame.inputs.length, 0),
-    [frameInputs]
+    () =>
+      filteredFrameInputs.reduce((sum, frame) => sum + frame.inputs.length, 0),
+    [filteredFrameInputs]
   )
 
   const toggleFrame = useCallback((frameId: number) => {
@@ -114,9 +217,15 @@ export function useHiddenInputs(
 
   return {
     frameInputs,
+    filteredFrameInputs,
     expandedFrames,
     editingInput,
     totalInputs,
+    totalCounts,
+    displayMode,
+    setDisplayMode,
+    searchQuery,
+    setSearchQuery,
     toggleFrame,
     handleEdit,
     handleEditChange,

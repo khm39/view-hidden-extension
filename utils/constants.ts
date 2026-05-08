@@ -53,3 +53,19 @@ export const ERROR_MESSAGES = {
 export const CONTEXT_MENU_IDS = {
   SHOW_OVERLAY: "view-hidden-show-overlay"
 } as const
+
+/**
+ * 表示モード定数
+ */
+export const DISPLAY_MODES = {
+  HIDDEN: "hidden",
+  VISIBLE: "visible",
+  ALL: "all"
+} as const
+
+/**
+ * chrome.storage.session キー
+ */
+export const STORAGE_KEYS = {
+  DISPLAY_MODE: "view-hidden:displayMode"
+} as const

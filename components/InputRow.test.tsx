@@ -14,6 +14,16 @@ function makeInput(overrides: Partial<HiddenInputInfo> = {}): HiddenInputInfo {
     formId: null,
     formName: null,
     xpath: '//*[@id="csrf"]',
+    tagName: "input",
+    type: "hidden",
+    label: null,
+    placeholder: null,
+    disabled: false,
+    readonly: false,
+    required: false,
+    checked: null,
+    options: null,
+    isVisuallyHidden: true,
     ...overrides
   }
 }
@@ -27,6 +37,7 @@ function setup(overrides: Partial<Parameters<typeof InputRow>[0]> = {}) {
     onEditChange: vi.fn(),
     onSave: vi.fn(),
     onCancel: vi.fn(),
+    onImmediateSave: vi.fn(),
     ...overrides
   }
   render(<InputRow {...props} />)
@@ -79,5 +90,57 @@ describe("InputRow", () => {
       "editing-value"
     )
     expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument()
+  })
+
+  it("label が設定されていれば label: 表記で表示される", () => {
+    setup({ input: makeInput({ label: "ユーザー名" }) })
+    expect(screen.getByText(/label: ユーザー名/)).toBeInTheDocument()
+  })
+
+  it("placeholder が設定されていれば placeholder: 表記で表示される", () => {
+    setup({ input: makeInput({ placeholder: "you@example.com" }) })
+    expect(screen.getByText(/placeholder: you@example.com/)).toBeInTheDocument()
+  })
+
+  it("required 属性があれば required バッジが表示される", () => {
+    setup({ input: makeInput({ required: true }) })
+    expect(screen.getByText("required")).toBeInTheDocument()
+  })
+
+  it("readonly の input は readonly バッジが表示され、クリックしても onEdit は呼ばれない", async () => {
+    const { onEdit } = setup({ input: makeInput({ readonly: true }) })
+    expect(screen.getByText("readonly")).toBeInTheDocument()
+    expect(
+      screen.getByText(/readonly 属性のため編集できません/)
+    ).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /を編集/ })).toBeNull()
+    // 値表示をクリックしても onEdit は呼ばれない
+    await userEvent.click(screen.getByText("abc123"))
+    expect(onEdit).not.toHaveBeenCalled()
+  })
+
+  it("disabled の input は disabled バッジと編集不可メッセージが出る", () => {
+    setup({ input: makeInput({ disabled: true }) })
+    expect(screen.getByText("disabled")).toBeInTheDocument()
+    expect(
+      screen.getByText(/disabled 属性のため編集できません/)
+    ).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /を編集/ })).toBeNull()
+  })
+
+  it("disabled な checkbox は onImmediateSave を呼ばない", async () => {
+    const { onImmediateSave } = setup({
+      input: makeInput({
+        type: "checkbox",
+        disabled: true,
+        checked: false,
+        value: "1"
+      })
+    })
+    const checkbox = screen.getByRole("checkbox")
+    expect(checkbox).toBeDisabled()
+    // disabled な checkbox はクリックしても onChange が発火しない
+    await userEvent.click(checkbox)
+    expect(onImmediateSave).not.toHaveBeenCalled()
   })
 })

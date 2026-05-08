@@ -17,7 +17,17 @@ function makeFrame(
       value: "v",
       formId: null,
       formName: null,
-      xpath: "/x"
+      xpath: "/x",
+      tagName: "input",
+      type: "hidden",
+      label: null,
+      placeholder: null,
+      disabled: false,
+      readonly: false,
+      required: false,
+      checked: null,
+      options: null,
+      isVisuallyHidden: true
     })
   )
   return {
