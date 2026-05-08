@@ -1,3 +1,11 @@
+export type FormElementTag = "input" | "textarea" | "select"
+
+export interface SelectOption {
+  value: string
+  text: string
+  selected: boolean
+}
+
 export interface HiddenInputInfo {
   id: string
   name: string
@@ -5,7 +13,19 @@ export interface HiddenInputInfo {
   formId: string | null
   formName: string | null
   xpath: string
+  tagName: FormElementTag
+  type: string
+  label: string | null
+  placeholder: string | null
+  disabled: boolean
+  readonly: boolean
+  required: boolean
+  checked: boolean | null
+  options: SelectOption[] | null
+  isVisuallyHidden: boolean
 }
+
+export type DisplayMode = "hidden" | "visible" | "all"
 
 export interface FrameInfo {
   frameId: number

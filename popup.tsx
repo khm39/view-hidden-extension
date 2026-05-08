@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 
 import { Button } from "~components/Button"
+import { DisplayModeToggle } from "~components/DisplayModeToggle"
 import { FrameSection } from "~components/FrameSection"
 import { PinIcon } from "~components/icons"
 import type { EditingInput } from "~components/types"
@@ -21,10 +22,13 @@ function IndexPopup() {
   const [tabId, setTabId] = useState<number | null>(null)
 
   const {
-    frameInputs,
+    filteredFrameInputs,
     expandedFrames,
     editingInput,
     totalInputs,
+    totalCounts,
+    displayMode,
+    setDisplayMode,
     toggleFrame,
     handleEdit,
     handleEditChange,
@@ -198,28 +202,38 @@ function IndexPopup() {
 
   return (
     <div className={panelClasses}>
-      <div className="sticky top-0 z-10 flex items-center gap-2 bg-bg-primary border-b border-border-default px-4 py-3 shadow-sm">
-        <div className="flex-1 min-w-0">
-          <h1 className="text-base font-bold text-text-primary m-0">
-            Hidden Input Viewer
-          </h1>
-          <p className="text-xs text-text-secondary mt-0.5">
-            {totalInputs}個のhidden inputを検出
-            {frameInputs.length > 1 && ` (${frameInputs.length}フレーム)`}
-          </p>
+      <div className="sticky top-0 z-10 bg-bg-primary border-b border-border-default px-4 py-3 shadow-sm">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-base font-bold text-text-primary m-0">
+              Hidden Input Viewer
+            </h1>
+            <p className="text-xs text-text-secondary mt-0.5">
+              {totalInputs}個の入力欄を表示中
+              {filteredFrameInputs.length > 1 &&
+                ` (${filteredFrameInputs.length}フレーム)`}
+            </p>
+          </div>
+          <Button variant="icon" onClick={handlePin} title="ページに固定表示">
+            <PinIcon />
+          </Button>
         </div>
-        <Button variant="icon" onClick={handlePin} title="ページに固定表示">
-          <PinIcon />
-        </Button>
+        <div className="mt-2">
+          <DisplayModeToggle
+            mode={displayMode}
+            counts={totalCounts}
+            onChange={setDisplayMode}
+          />
+        </div>
       </div>
 
-      {frameInputs.length === 0 ? (
+      {filteredFrameInputs.length === 0 ? (
         <div className="p-3 text-center text-text-tertiary text-[13px] italic bg-bg-primary">
           フレームが見つかりません
         </div>
       ) : (
         <div className="flex flex-col">
-          {frameInputs.map((frameData) => (
+          {filteredFrameInputs.map((frameData) => (
             <FrameSection
               key={frameData.frame.frameId}
               frameData={frameData}

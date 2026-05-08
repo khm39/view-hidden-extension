@@ -3,6 +3,7 @@ import type { PlasmoCSConfig, PlasmoGetStyle } from "plasmo"
 import { useEffect, useRef, useState } from "react"
 
 import { Button } from "~components/Button"
+import { DisplayModeToggle } from "~components/DisplayModeToggle"
 import { FrameSection } from "~components/FrameSection"
 import { CloseIcon, DragIcon } from "~components/icons"
 import { useHiddenInputs } from "~hooks/useHiddenInputs"
@@ -32,10 +33,13 @@ function Overlay() {
   const overlayRef = useRef<HTMLDivElement>(null)
 
   const {
-    frameInputs,
+    filteredFrameInputs,
     expandedFrames,
     editingInput,
     totalInputs,
+    totalCounts,
+    displayMode,
+    setDisplayMode,
     toggleFrame,
     handleEdit,
     handleEditChange,
@@ -163,8 +167,9 @@ function Overlay() {
             Hidden Input Viewer
           </h1>
           <p className="text-[11px] text-text-secondary mt-0.5">
-            {totalInputs}個のhidden inputを検出
-            {frameInputs.length > 1 && ` (${frameInputs.length}フレーム)`}
+            {totalInputs}個の入力欄を表示中
+            {filteredFrameInputs.length > 1 &&
+              ` (${filteredFrameInputs.length}フレーム)`}
           </p>
         </div>
         <Button variant="icon-ghost" onClick={handleClose} title="閉じる">
@@ -172,14 +177,24 @@ function Overlay() {
         </Button>
       </div>
 
+      <div
+        className="px-4 py-2 border-b border-border-default bg-bg-primary"
+        onMouseDown={(e) => e.stopPropagation()}>
+        <DisplayModeToggle
+          mode={displayMode}
+          counts={totalCounts}
+          onChange={setDisplayMode}
+        />
+      </div>
+
       <div className="overlay-body flex-1 overflow-y-auto">
-        {frameInputs.length === 0 ? (
+        {filteredFrameInputs.length === 0 ? (
           <div className="p-6 text-center text-text-tertiary italic">
             フレームが見つかりません
           </div>
         ) : (
           <div className="flex flex-col">
-            {frameInputs.map((frameData) => (
+            {filteredFrameInputs.map((frameData) => (
               <FrameSection
                 key={frameData.frame.frameId}
                 frameData={frameData}
