@@ -13,7 +13,17 @@ function makeInput(name: string, value = "v"): HiddenInputInfo {
     value,
     formId: null,
     formName: null,
-    xpath: `//*[@id="${name}"]`
+    xpath: `//*[@id="${name}"]`,
+    tagName: "input",
+    type: "hidden",
+    label: null,
+    placeholder: null,
+    disabled: false,
+    readonly: false,
+    required: false,
+    checked: null,
+    options: null,
+    isVisuallyHidden: true
   }
 }
 
@@ -45,6 +55,7 @@ function setup(overrides: Partial<Parameters<typeof FrameSection>[0]> = {}) {
     onEditChange: vi.fn(),
     onSave: vi.fn(),
     onCancel: vi.fn(),
+    onImmediateSave: vi.fn(),
     ...overrides
   }
   render(<FrameSection {...props} />)

@@ -13,7 +13,17 @@ function makeInput(name: string, value = ""): HiddenInputInfo {
     value,
     formId: null,
     formName: null,
-    xpath: `/input[@name="${name}"]`
+    xpath: `/input[@name="${name}"]`,
+    tagName: "input",
+    type: "hidden",
+    label: null,
+    placeholder: null,
+    disabled: false,
+    readonly: false,
+    required: false,
+    checked: null,
+    options: null,
+    isVisuallyHidden: true
   }
 }
 

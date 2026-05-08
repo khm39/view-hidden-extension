@@ -2,10 +2,32 @@ import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
+import type { HiddenInputInfo } from "~types"
+
 import { InputEditForm } from "./InputEditForm"
+
+const baseInput: HiddenInputInfo = {
+  id: "test",
+  name: "test",
+  value: "",
+  formId: null,
+  formName: null,
+  xpath: '/input[@name="test"]',
+  tagName: "input",
+  type: "hidden",
+  label: null,
+  placeholder: null,
+  disabled: false,
+  readonly: false,
+  required: false,
+  checked: null,
+  options: null,
+  isVisuallyHidden: true
+}
 
 function setup(overrides: Partial<Parameters<typeof InputEditForm>[0]> = {}) {
   const props = {
+    input: baseInput,
     value: "initial",
     onChange: vi.fn(),
     onSave: vi.fn(),

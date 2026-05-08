@@ -14,6 +14,16 @@ function makeInput(overrides: Partial<HiddenInputInfo> = {}): HiddenInputInfo {
     formId: null,
     formName: null,
     xpath: '//*[@id="csrf"]',
+    tagName: "input",
+    type: "hidden",
+    label: null,
+    placeholder: null,
+    disabled: false,
+    readonly: false,
+    required: false,
+    checked: null,
+    options: null,
+    isVisuallyHidden: true,
     ...overrides
   }
 }
@@ -27,6 +37,7 @@ function setup(overrides: Partial<Parameters<typeof InputRow>[0]> = {}) {
     onEditChange: vi.fn(),
     onSave: vi.fn(),
     onCancel: vi.fn(),
+    onImmediateSave: vi.fn(),
     ...overrides
   }
   render(<InputRow {...props} />)
