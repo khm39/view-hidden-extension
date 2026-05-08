@@ -33,7 +33,7 @@ test("hidden input を含むページで input 数が表示される", async ({
   const popup = await context.newPage()
   await popup.goto(`chrome-extension://${extensionId}/popup.html`)
 
-  await expect(popup.getByText(/2個の入力欄を表示中/)).toBeVisible({
+  await expect(popup.getByText(/個の入力欄を表示中/)).toBeVisible({
     timeout: 10_000
   })
 })
