@@ -135,6 +135,20 @@ function Overlay() {
     setEditingInput(null)
   }
 
+  const handleImmediateSave = (
+    frameId: number,
+    xpath: string,
+    value: string
+  ) => {
+    const message: UpdateInputValueMessage = {
+      type: MESSAGE_TYPES.UPDATE_INPUT_VALUE as "UPDATE_INPUT_VALUE",
+      frameId,
+      xpath,
+      value
+    }
+    chrome.runtime.sendMessage(message)
+  }
+
   if (!visible) return null
 
   const containerClasses = cn(
@@ -205,6 +219,7 @@ function Overlay() {
                 onEditChange={handleEditChange}
                 onSave={handleSave}
                 onCancel={handleCancel}
+                onImmediateSave={handleImmediateSave}
               />
             ))}
           </div>

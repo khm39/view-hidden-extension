@@ -12,7 +12,8 @@ export function FrameSection({
   onEdit,
   onEditChange,
   onSave,
-  onCancel
+  onCancel,
+  onImmediateSave
 }: FrameSectionProps) {
   const { frame, inputs } = frameData
   const contentId = `frame-content-${frame.frameId}`
@@ -52,6 +53,9 @@ export function FrameSection({
                   onEditChange={onEditChange}
                   onSave={onSave}
                   onCancel={onCancel}
+                  onImmediateSave={(value) =>
+                    onImmediateSave(frame.frameId, input.xpath, value)
+                  }
                 />
               ))}
             </div>

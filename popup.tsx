@@ -139,6 +139,26 @@ function IndexPopup() {
     }
   }
 
+  const handleImmediateSave = (
+    frameId: number,
+    xpath: string,
+    value: string
+  ) => {
+    if (tabId === null) return
+
+    const message: UpdateInputValueMessageWithTab = {
+      type: MESSAGE_TYPES.UPDATE_INPUT_VALUE as "UPDATE_INPUT_VALUE",
+      tabId,
+      frameId,
+      xpath,
+      value
+    }
+
+    if (!sendMessage(message)) {
+      setError(ERROR_MESSAGES.CONNECTION_LOST)
+    }
+  }
+
   const panelClasses = cn(
     "w-[400px] max-h-[500px]",
     "overflow-auto bg-bg-primary"
@@ -244,6 +264,7 @@ function IndexPopup() {
               onEditChange={handleEditChange}
               onSave={handleSave}
               onCancel={handleCancel}
+              onImmediateSave={handleImmediateSave}
             />
           ))}
         </div>
