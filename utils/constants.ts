@@ -62,3 +62,10 @@ export const DISPLAY_MODES = {
   VISIBLE: "visible",
   ALL: "all"
 } as const
+
+/**
+ * chrome.storage.session キー
+ */
+export const STORAGE_KEYS = {
+  DISPLAY_MODE: "view-hidden:displayMode"
+} as const

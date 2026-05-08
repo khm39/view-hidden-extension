@@ -40,6 +40,8 @@ function Overlay() {
     totalCounts,
     displayMode,
     setDisplayMode,
+    searchQuery,
+    setSearchQuery,
     toggleFrame,
     handleEdit,
     handleEditChange,
@@ -198,6 +200,20 @@ function Overlay() {
           mode={displayMode}
           counts={totalCounts}
           onChange={setDisplayMode}
+        />
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="name / value / type で検索"
+          aria-label="入力欄を検索"
+          className={cn(
+            "w-full mt-2 px-2.5 py-1.5",
+            "bg-input-bg border border-input-border rounded-md",
+            "text-xs text-text-primary",
+            "placeholder:text-text-tertiary",
+            "focus:outline-none focus:border-input-border-focus"
+          )}
         />
       </div>
 
