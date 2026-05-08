@@ -11,12 +11,7 @@ import type {
   UpdateInputValueMessageWithTab
 } from "~types"
 import { cn } from "~utils/cn"
-import {
-  ERROR_MESSAGES,
-  MESSAGE_TYPES,
-  TIMING,
-  UI_CONFIG
-} from "~utils/constants"
+import { ERROR_MESSAGES, MESSAGE_TYPES, TIMING } from "~utils/constants"
 
 import "./style.css"
 
@@ -141,7 +136,7 @@ function IndexPopup() {
   }
 
   const panelClasses = cn(
-    `w-[${UI_CONFIG.PANEL_WIDTH}] max-h-[${UI_CONFIG.PANEL_MAX_HEIGHT}]`,
+    "w-[400px] max-h-[500px]",
     "overflow-auto bg-bg-primary"
   )
 

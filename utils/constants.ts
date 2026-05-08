@@ -37,18 +37,6 @@ export const TIMING = {
 } as const
 
 /**
- * UI設定定数
- */
-export const UI_CONFIG = {
-  /** ポップアップ/オーバーレイの幅 */
-  PANEL_WIDTH: "400px",
-  /** ポップアップ/オーバーレイの最大高さ */
-  PANEL_MAX_HEIGHT: "500px",
-  /** オーバーレイのz-index（最大値） */
-  OVERLAY_Z_INDEX: "2147483647"
-} as const
-
-/**
  * エラーメッセージ定数
  */
 export const ERROR_MESSAGES = {
